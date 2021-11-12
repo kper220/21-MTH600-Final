@@ -1,6 +1,8 @@
 # opioid crisis analysis library.
 # David Li, MTH 600.
 
+import numpy as np
+from numpy import array
 import pandas as pd
 
 # one-to-one correspondence between states and initials.
@@ -30,7 +32,6 @@ def locate(state_in, county, df_geo):
             # I don't know why INTPLTLONG is like this.
 
             return (lat, lon)
-
 
 # dataframe analysis.
 def feature_extract(df, df_metadata):
@@ -125,6 +126,60 @@ def state_and_county(geography):
     state = state_in[state.lower()] # convert state to initials
     county = ' '.join(county.split()[:-1]) # remove the word "county"
     return (state, county)
+
+def drug_matrix(df_nflis, substanceNamesDict):
+    """
+    Takes the nflis dataframe and names of substances,
+    returns an array of substance use vectors.
+    """
+
+    n = df_nflis.shape[0] # number of instances.
+    m = len(substanceNamesDict) # number of distinct drugs.
+
+    drug_use_matrix = np.zeros((n, m)) # nxm dimensional zero.
+
+    # iterate through each example.
+    # for each example, determine drug type and drug report count.
+    for i in range(n):
+        substanceName = df_nflis["SubstanceName"].iloc[i]
+        substanceNameIndex = substanceNamesDict[substanceName]
+        drugReports = int(df_nflis["DrugReports"].iloc[i])
+        drug_use_matrix[i][substanceNameIndex] = drugReports
+
+    return drug_use_matrix
+
+def drug_vector(yyyy, state_in, county, df_nflis, substanceNamesDict, identify=False):
+    """
+    Takes year, state, county, and returns overall drug reports as vector.
+
+    First input is instances of drug use,
+    second is indices which allow for searching up corresponding drug.
+    """
+
+    n = df_nflis.shape[0]
+    d_matrix = drug_matrix(df_nflis, substanceNamesDict) # drug matrix.
+
+    # get all vectors corresponding to the instance.
+    drug_indices = [
+            i for i in range(n) if df_nflis["YYYY"][i] == np.int(yyyy)
+            and df_nflis["State"][i].lower() == state_in.lower()
+            and df_nflis["COUNTY"][i].lower() == county.lower()
+            ]
+    
+    d_vec = sum(d_matrix[i] for i in drug_indices)
+
+    if identify:
+        # identifies the drugs corresponding to indices.
+        # compute inverse drug map.
+
+        drug_dict = {
+                df_nflis["SubstanceName"].iloc[i]:df_nflis["DrugReports"].iloc[i]
+                for i in drug_indices
+                }
+
+        return d_vec, drug_dict
+    else:
+        return d_vec
 
 if __name__ == "__main__":
 
