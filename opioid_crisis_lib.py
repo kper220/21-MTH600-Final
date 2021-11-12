@@ -118,7 +118,6 @@ def feature_index2(ddf_yyyy, ddf_metadata_yyyy, include_geography=False):
 
     return univ_map
 
-
 def feature_index(ddf, ddf_metadata, include_geography=False):
     """
     Takes a list of dataframes and metadataframes.
@@ -165,6 +164,12 @@ def feature_index(ddf, ddf_metadata, include_geography=False):
             univ_map[desc][i] = _get_key(_df, desc)
 
     return univ_map
+
+def label_from_feature_index(yyyy, f_index):
+    """
+    Takes year and feature index, returns list of labels.
+    """
+    return [f_index[key][yyyy] for key in f_index.keys()]
 
 def state_and_county(geography):
     """
@@ -231,7 +236,7 @@ def drug_vector(yyyy, state_in, county, df_nflis, substanceNamesDict, identify=F
     else:
         return d_vec
 
-def generate_sample(ddf_yyyy, ddf_yyyy_meta, f_index, df_nflis, substanceNamesDict, df_geo):
+def generate_sample(ddf_yyyy, ddf_yyyy_meta, f_index, df_nflis, substanceNamesDict, df_geo, debug=False):
     """
     Takes relevant socio-economic dataframes, metadataframes,
     applicable (universal) socio-economic features and drug use data.
@@ -256,13 +261,15 @@ def generate_sample(ddf_yyyy, ddf_yyyy_meta, f_index, df_nflis, substanceNamesDi
         df = ddf_yyyy[year] # dataframe for this year.
         df_msum = sum(df_sample_sizes[:l]) # samples processed by previous dataframes.
         df_m = df_sample_sizes[l] # current dataframe's sample size.
+        labels = label_from_feature_index(year, f_index) # get appropriate labels for the year.
+        sub_df = df[labels] # sub dataframe comprised of the appropriate labels.
 
         for i in range(df_m):
             i_sample = i + df_msum # index in the sample matrix
             i_df = i + 1 # index in the dataframe
             # append geographic data.
             try:
-                state_in, county = state_and_county(df["GEO.display-label"].iloc[i_df])[:2] # retrieve state initials, county.
+                state_in, county, state = state_and_county(df["GEO.display-label"].iloc[i_df]) # retrieve state initials, county.
             except:
                 print(l)
                 print(i)
@@ -278,6 +285,22 @@ def generate_sample(ddf_yyyy, ddf_yyyy_meta, f_index, df_nflis, substanceNamesDi
             sample[i_sample][1] = lon
 
             # append socio-economic data.
+            try:
+                sample[i_sample][2:2+socio_n] = np.array(df[labels].iloc[i_df])
+            except ValueError: # dealing with '(X)'.
+                _tempdat = df[labels].iloc[i_df]
+                _tempdat[list(filter(lambda i:_tempdat[i]  == '(X)', range(len(_tempdat))))] = 0 # replace all '(X)' with zero.
+                sample[i_sample][2:2+socio_n] = _tempdat
+                #print(year)
+                #print(i_df)
+                #print(df[labels].iloc[i_df])
+                #raise ValueError
+
+            # append drug data.
+            drug_vec = drug_vector(year, state_in, county, df_nflis, substanceNamesDict)
+            sample[i_sample][2+socio_n:] = drug_vec
+            if debug:
+                print("processed {}, {}".format(county, state_in))
 
     return sample
 
