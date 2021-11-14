@@ -252,7 +252,7 @@ def generate_sample(ddf_yyyy, ddf_yyyy_meta, f_index, df_nflis, substanceNamesDi
     geo_n = 2 # positional features: longitude and latitude.
     socio_n = len(f_index) # non-positional, socio-economic features.
     drug_n = len(substanceNamesDict) # drug type features.
-    n = geo_n + socio_n + drug_n # feature dimension equals sum of above three features.
+    n = 1 + geo_n + socio_n + drug_n # feature dimension equals sum of above three features, including year.
 
     sample = np.zeros((m, n)) # instantiate mxn sample matrix.
     
@@ -265,8 +265,13 @@ def generate_sample(ddf_yyyy, ddf_yyyy_meta, f_index, df_nflis, substanceNamesDi
         sub_df = df[labels] # sub dataframe comprised of the appropriate labels.
 
         for i in range(df_m):
+
             i_sample = i + df_msum # index in the sample matrix
             i_df = i + 1 # index in the dataframe
+            
+            # append year data.
+            sample[i_sample][0] = year
+
             # append geographic data.
             try:
                 state_in, county, state = state_and_county(df["GEO.display-label"].iloc[i_df]) # retrieve state initials, county.
@@ -281,16 +286,16 @@ def generate_sample(ddf_yyyy, ddf_yyyy_meta, f_index, df_nflis, substanceNamesDi
             except TypeError:
                 lat = None
                 lon = None
-            sample[i_sample][0] = lat
-            sample[i_sample][1] = lon
+            sample[i_sample][1] = lat
+            sample[i_sample][2] = lon
 
             # append socio-economic data.
             try:
-                sample[i_sample][2:2+socio_n] = np.array(df[labels].iloc[i_df])
+                sample[i_sample][3:3+socio_n] = np.array(df[labels].iloc[i_df])
             except ValueError: # dealing with '(X)'.
                 _tempdat = df[labels].iloc[i_df]
                 _tempdat[list(filter(lambda i:_tempdat[i]  == '(X)', range(len(_tempdat))))] = 0 # replace all '(X)' with zero.
-                sample[i_sample][2:2+socio_n] = _tempdat
+                sample[i_sample][3:3+socio_n] = _tempdat
                 #print(year)
                 #print(i_df)
                 #print(df[labels].iloc[i_df])
@@ -298,7 +303,7 @@ def generate_sample(ddf_yyyy, ddf_yyyy_meta, f_index, df_nflis, substanceNamesDi
 
             # append drug data.
             drug_vec = drug_vector(year, state_in, county, df_nflis, substanceNamesDict)
-            sample[i_sample][2+socio_n:] = drug_vec
+            sample[i_sample][3+socio_n:] = drug_vec
             if debug:
                 print("processed {}, {}".format(county, state_in))
 
@@ -392,6 +397,19 @@ def standardize(arr):
 def threshold_pass(vec, t):
     # takes a vector and returns zero for entries whose absolute value is below threshold t.
     return np.array([v if np.abs(v) >= t else 0 for v in vec])
+
+def pc_explain(i, pc_svd, threshold, features):
+    """
+    Takes index argument, an argument of principal components, and a threshold argument.
+    Returns a description of features of the i-th principal component
+    whose coefficient is above the threshold.
+    """
+
+    pc_i = pc_svd.T[i]
+    pc_i = threshold_pass(pc_i, threshold)
+    return list(filter(lambda x: x[1] != 0, [(features[i], pc_i[i]) for i in range(len(pc_i))]))
+
+
 
 if __name__ == "__main__":
 
