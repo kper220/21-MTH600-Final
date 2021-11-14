@@ -304,6 +304,91 @@ def generate_sample(ddf_yyyy, ddf_yyyy_meta, f_index, df_nflis, substanceNamesDi
 
     return sample
 
+# index to descriptor.
+def find_nonzero(mat):
+    """
+    Takes a matrix with (possibly) zero rows, and returns a (possibly) smaller matrix without those zero rows.
+    """
+
+    m, n = mat.shape # get dimensions.
+    zero_indices = list()
+    nonzero_indices = list()
+
+    for i in range(m):
+        if sum(np.abs(mat[i])) != 0:
+            nonzero_indices.append(i)
+        else:
+            zero_indices.append(i)
+
+    return nonzero_indices, zero_indices
+
+def keep_rows(mat, indices):
+    """
+    Takes a matrix and row indices to keep, and returns a matrix with the kept rows.
+    """
+    return mat[indices]
+
+def keep_cols(mat, indices):
+    """
+    Takes a matrix and column indices to keep, and returns a matrix with kept columns.
+    """
+    return keep_rows(mat.T, indices).T
+
+# find zero rows of a matrix and return matrix without these rows.
+def kill_zeros(mat):
+    """
+    Takes a matrix with (possibly) zero rows, and returns a (possibly) smaller matrix without those zero rows.
+    """
+
+    nonzero_indices = find_nonzero(mat)[0]
+
+    # create smaller matrix.
+    return np.array([mat[i] for i in nonzero_indices])
+
+def identify_sample_points(indices, ddf_yyyy):
+    """
+    Find the sample points corresponding to the indices.
+    """
+    m_indices = len(indices)
+    df_sample_sizes = [ddf_yyyy[yyyy].shape[0] - 1 for yyyy in ddf_yyyy] # -1 so we exclude row with labels.
+    indexed_sample = np.empty((m_indices, 3), dtype=object) # identified by year, county and state.
+    years = sorted(ddf_yyyy.keys())
+
+    curr_df_in = 0
+    curr_df = ddf_yyyy[years[0]]
+    curr_df_size = df_sample_sizes[0]
+
+    for i in range(m_indices):
+        i_ddf = indices[i] # index corresponding to the superdataframe.
+        while i_ddf >= curr_df_size:
+            curr_df_in += 1
+            curr_df = ddf_yyyy[years[curr_df_in]]
+            curr_df_size += df_sample_sizes[curr_df_in]
+
+        i_df = i_ddf - sum(df_sample_sizes[:curr_df_in]) + 1 # index within current dataframe (accounted for label row).
+        indexed_sample[i][0] = years[curr_df_in] # year of sample point.
+
+        # get state and county
+        state_in, county, state = state_and_county(curr_df["GEO.display-label"].iloc[i_df])
+        indexed_sample[i][1] = state_in
+        indexed_sample[i][2] = county
+
+    return indexed_sample
+
+# standardization.
+def standardize(arr):
+    """
+    Takes a numpy array and standardizes it (with respect to columns).
+    """
+
+    arrT = np.copy(arr.T) # transpose input array.
+    arrT = kill_zeros(arrT)
+
+    for i, row in enumerate(arrT):
+        arrT[i] = (row - np.nanmean(row)) / np.nanstd(row)
+
+    return arrT.T # return un-transposed array.
+
 if __name__ == "__main__":
 
     # run this code.
