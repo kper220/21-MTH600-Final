@@ -389,6 +389,10 @@ def standardize(arr):
 
     return arrT.T # return un-transposed array.
 
+def threshold_pass(vec, t):
+    # takes a vector and returns zero for entries whose absolute value is below threshold t.
+    return np.array([v if np.abs(v) >= t else 0 for v in vec])
+
 if __name__ == "__main__":
 
     # run this code.
