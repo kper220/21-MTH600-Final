@@ -74,7 +74,28 @@ def feature_extract(df, df_metadata):
 
     return features
 
-def feature_index2(ddf_yyyy, ddf_metadata_yyyy, include_geography=False):
+def feature_extract2(df, df_metadata):
+    """
+    Takes data set and metadata set, extracts features that are compatible with PCA (i.e. scores or percentages).
+    """
+    features = ["GEO.display-label"]
+
+    for key in df_metadata["GEO.id"]:
+        if key[0] == "G":
+            continue
+        desc = df[key].iloc[0] # get description
+        desc = desc.split() # split to words.
+        if desc[0] == "Percent;":
+            first_dat = df[key].iloc[1]
+            try:
+                x = np.float64(first_dat) # see if can be converted to integer.
+            except ValueError:
+                continue
+            features.append(key)
+
+    return features
+
+def feature_index2(ddf_yyyy, ddf_metadata_yyyy, include_geography=False, extraction=feature_extract):
     """
     Takes a list of dataframes and metadataframes (indexed by year).
     Returns dictionary of universally accessible features
@@ -90,7 +111,7 @@ def feature_index2(ddf_yyyy, ddf_metadata_yyyy, include_geography=False):
     total_features = [None for _ in range(n)]
     
     for i, year in enumerate(ddf_yyyy.keys()):
-        _f_extract = feature_extract(ddf_yyyy[year], ddf_metadata_yyyy[year])[1:] # get features.
+        _f_extract = extraction(ddf_yyyy[year], ddf_metadata_yyyy[year])[1:] # get features.
         _f_dict = dict() # create dictionary map: set of features to set of labels (which are indexed by year).
 
         for f in _f_extract:
@@ -293,6 +314,7 @@ def generate_sample(ddf_yyyy, ddf_yyyy_meta, f_index, df_nflis, substanceNamesDi
             try:
                 sample[i_sample][3:3+socio_n] = np.array(df[labels].iloc[i_df])
             except ValueError: # dealing with '(X)'.
+                #sample[i_sample][3:3+socio_n] = np.nan #just set to nan, we'll remove later.
                 _tempdat = df[labels].iloc[i_df]
                 _tempdat[list(filter(lambda i:_tempdat[i]  == '(X)', range(len(_tempdat))))] = 0 # replace all '(X)' with zero.
                 sample[i_sample][3:3+socio_n] = _tempdat
@@ -409,7 +431,16 @@ def pc_explain(i, pc_svd, threshold, features):
     pc_i = threshold_pass(pc_i, threshold)
     return list(filter(lambda x: x[1] != 0, [(features[i], pc_i[i]) for i in range(len(pc_i))]))
 
-
+from matplotlib import pyplot as plt
+def compare_plots(lab1a, lab1b, lab2a, lab2b, df1, df2, title1, title2, alpha=.1):
+    plt.figure(figsize=(16, 8))
+    plt.subplot(1, 2, 1)
+    plt.scatter(df1[lab1a], df1[lab2a], alpha=alpha)
+    plt.title(title1)
+    plt.subplot(1, 2, 2)
+    plt.scatter(df2[lab1b], df2[lab2b], alpha=alpha)
+    plt.title(title2)
+    plt.show()
 
 if __name__ == "__main__":
 
